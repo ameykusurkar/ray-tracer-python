@@ -5,7 +5,7 @@ import numpy as np
 
 WIDTH, HEIGHT = 400, 300
 FOV = (0.3) * np.pi
-framebuffer = np.zeros((HEIGHT, WIDTH, 3), dtype=np.uint8)
+framebuffer = np.zeros((HEIGHT, WIDTH, 3))
 
 YELLOW = [255, 255, 0]
 BLUE = [0, 0, 255]
@@ -71,12 +71,15 @@ spheres = [
     Sphere(np.array([1, -3, -16]), 3, GREEN, IVORY),
 ]
 
-light = Light(np.array([10, 10, -2]), 1)
+lights = [
+    Light(np.array([-2, 10, -20]), 1.9),
+    Light(np.array([-16, 10, 16]), 1.6),
+]
 
 def reflect(incident, normal):
     return 2 * normal * np.dot(incident, normal) - incident
 
-def cast_ray(ray, spheres, light):
+def cast_ray(ray, spheres, lights):
     color = BLACK
     closest_dist = float("inf")
     closest_intersection = None
@@ -97,11 +100,14 @@ def cast_ray(ray, spheres, light):
 
     if closest_intersection is None: return color
 
-    light_dir = light.pos - closest_intersection
-    light_dir = light_dir / np.linalg.norm(light_dir)
-    diffuse_intensity = light.intensity * max(0, np.dot(light_dir, closest_normal))
-    rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
-    specular_intensity = light.intensity * np.power(rv_dot, material.specular_exponent)
+    diffuse_intensity = 0
+    specular_intensity = 0
+    for light in lights:
+        light_dir = light.pos - closest_intersection
+        light_dir = light_dir / np.linalg.norm(light_dir)
+        diffuse_intensity += light.intensity * max(0, np.dot(light_dir, closest_normal))
+        rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
+        specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
 
     intensity = diffuse_intensity * np.array(color) * material.diffuse_reflection + \
                 specular_intensity * np.array([255, 255, 255]) * material.specular_reflection
@@ -115,12 +121,9 @@ for j in range(0, len(framebuffer)):
         v = np.array([x, y, -1])
         v = v / np.linalg.norm(v)
         ray = Ray(np.array([0, 0, 0]), v)
-        intensity = cast_ray(ray, spheres, light)
-        max_value = max(intensity)
-        if max_value > 255:
-            intensity = intensity / max_value * 255
+        framebuffer[j, i] = cast_ray(ray, spheres, lights)
 
-        framebuffer[j, i] = intensity
-
-im = Image.fromarray(framebuffer)
+framebuffer /= framebuffer.reshape(-1, 3).max(axis=0)
+framebuffer *= 255
+im = Image.fromarray(framebuffer.astype(np.uint8))
 im.save("test.png")
