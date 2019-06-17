@@ -1,4 +1,5 @@
 from PIL import Image
+from collections import namedtuple
 import numpy as np
 # import pdb; pdb.set_trace()
 
@@ -11,6 +12,12 @@ BLUE = [0, 0, 255]
 RED = [255, 0, 0]
 GREEN = [0, 255, 0]
 BLACK = [0, 0, 0]
+
+Light = namedtuple("Light", ["pos", "intensity"])
+Material = namedtuple("Material", ["diffuse_reflection", "specular_reflection", "specular_exponent"])
+
+IVORY = Material(0.6, 0.3, 50)
+RUBBER = Material(0.9, 0.1, 10)
 
 class Ray:
     def __init__(self, p, v):
@@ -26,16 +33,12 @@ class Ray:
         proj_vector = (uv_dot / np.linalg.norm(ray.v)) * self.v
         return self.p + proj_vector
 
-class Light:
-    def __init__(self, pos, intensity):
-        self.pos = pos
-        self.intensity = intensity
-
 class Sphere:
-    def __init__(self, center, radius, color):
+    def __init__(self, center, radius, color, material):
         self.center = center
         self.radius = radius
         self.color = color
+        self.material = material
 
     def ray_intersection(self, ray):
         projection = ray.projection(self.center)
@@ -62,19 +65,23 @@ class Sphere:
         return intersection, intersect_dist, normal
 
 spheres = [
-    Sphere(np.array([-5, 0, -16]), 2, YELLOW),
-    Sphere(np.array([10, 3, -34]), 4, BLUE),
-    Sphere(np.array([-2, 5, -40]), 5, RED),
-    Sphere(np.array([1, -3, -16]), 3, GREEN),
+    Sphere(np.array([-5, 0, -16]), 2, YELLOW, RUBBER),
+    Sphere(np.array([10, 3, -34]), 4, BLUE, RUBBER),
+    Sphere(np.array([-2, 5, -40]), 5, RED, IVORY),
+    Sphere(np.array([1, -3, -16]), 3, GREEN, IVORY),
 ]
 
 light = Light(np.array([10, 10, -2]), 1)
+
+def reflect(incident, normal):
+    return 2 * normal * np.dot(incident, normal) - incident
 
 def cast_ray(ray, spheres, light):
     color = BLACK
     closest_dist = float("inf")
     closest_intersection = None
     closest_normal = None
+    material = None
     for sphere in spheres:
         result = sphere.ray_intersection(ray)
         if result is None: continue
@@ -86,14 +93,20 @@ def cast_ray(ray, spheres, light):
             closest_intersection = intersection
             closest_normal = normal
             color = sphere.color
+            material = sphere.material
 
     if closest_intersection is None: return color
 
     light_dir = light.pos - closest_intersection
     light_dir = light_dir / np.linalg.norm(light_dir)
-    intensity = light.intensity * max(0, np.dot(light_dir, closest_normal))
+    diffuse_intensity = light.intensity * max(0, np.dot(light_dir, closest_normal))
+    rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
+    specular_intensity = light.intensity * np.power(rv_dot, material.specular_exponent)
 
-    return np.minimum(intensity * np.array(color), 255)
+    intensity = diffuse_intensity * np.array(color) * material.diffuse_reflection + \
+                specular_intensity * np.array([255, 255, 255]) * material.specular_reflection,
+
+    return np.minimum(intensity, 255)
 
 for j in range(0, len(framebuffer)):
     for i in range(0, len(framebuffer[j])):
