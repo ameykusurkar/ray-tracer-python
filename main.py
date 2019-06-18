@@ -72,8 +72,8 @@ spheres = [
 ]
 
 lights = [
-    Light(np.array([-2, 10, -20]), 1.9),
-    Light(np.array([-16, 10, 16]), 1.6),
+    Light(np.array([-2, 10, -20]), 1),
+    Light(np.array([-16, 10, 16]), 0.8),
 ]
 
 def reflect(incident, normal):
@@ -123,7 +123,12 @@ for j in range(0, len(framebuffer)):
         ray = Ray(np.array([0, 0, 0]), v)
         framebuffer[j, i] = cast_ray(ray, spheres, lights)
 
-framebuffer /= framebuffer.reshape(-1, 3).max(axis=0)
-framebuffer *= 255
+for j in range(0, len(framebuffer)):
+    for i in range(0, len(framebuffer[j])):
+        color = framebuffer[j, i]
+        if color.max() > 255:
+            color = color / color.max() * 255
+            framebuffer[j, i] = color
+
 im = Image.fromarray(framebuffer.astype(np.uint8))
 im.save("test.png")
