@@ -65,7 +65,7 @@ class Sphere:
         return intersection, intersect_dist, normal
 
 spheres = [
-    Sphere(np.array([-5, 0, -16]), 2, YELLOW, RUBBER),
+    Sphere(np.array([-5, 4, -20]), 2, YELLOW, RUBBER),
     Sphere(np.array([10, 3, -34]), 4, BLUE, RUBBER),
     Sphere(np.array([-2, 5, -40]), 5, RED, IVORY),
     Sphere(np.array([1, -3, -16]), 3, GREEN, IVORY),
@@ -79,8 +79,8 @@ lights = [
 def reflect(incident, normal):
     return 2 * normal * np.dot(incident, normal) - incident
 
-def cast_ray(ray, spheres, lights):
-    color = BLACK
+def scene_intersection(ray, spheres):
+    color = None
     closest_dist = float("inf")
     closest_intersection = None
     closest_normal = None
@@ -98,14 +98,28 @@ def cast_ray(ray, spheres, lights):
             color = sphere.color
             material = sphere.material
 
-    if closest_intersection is None: return color
+    if closest_intersection is None: return None
+
+    return closest_intersection, closest_normal, color, material
+
+def cast_ray(ray, spheres, lights):
+    result = scene_intersection(ray, spheres)
+    if result is None: return BLACK
+    intersection, normal, color, material = result
 
     diffuse_intensity = 0
     specular_intensity = 0
     for light in lights:
-        light_dir = light.pos - closest_intersection
-        light_dir = light_dir / np.linalg.norm(light_dir)
-        diffuse_intensity += light.intensity * max(0, np.dot(light_dir, closest_normal))
+        light_dir = light.pos - intersection
+        light_dist = np.linalg.norm(light_dir)
+        light_dir = light_dir / light_dist
+
+        offset = 1e-3 * normal
+        ln_dot = np.dot(light_dir, normal)
+        shadow_p = intersection - offset if ln_dot < 0 else intersection + offset
+        if scene_intersection(Ray(shadow_p, light_dir), spheres): continue
+
+        diffuse_intensity += light.intensity * max(0, ln_dot)
         rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
         specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
 
