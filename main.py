@@ -1,5 +1,6 @@
 from PIL import Image
 from collections import namedtuple
+import time
 import numpy as np
 # import pdb; pdb.set_trace()
 
@@ -196,6 +197,8 @@ def cast_ray(ray, objects, lights, depth=0):
 
     return intensity
 
+start = time.time()
+
 for j in range(0, len(framebuffer)):
     for i in range(0, len(framebuffer[j])):
         x =  (2 * (i + 0.5)/WIDTH  - 1) * np.tan(FOV/2) * WIDTH / HEIGHT
@@ -212,5 +215,6 @@ for j in range(0, len(framebuffer)):
             color = color / color.max() * 255
             framebuffer[j, i] = color
 
+print(f"Time taken: {time.time()-start:0.2f} seconds")
 im = Image.fromarray(framebuffer.astype(np.uint8))
 im.save("test.png")
