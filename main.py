@@ -81,7 +81,7 @@ lights = [
 ]
 
 def reflect(incident, normal):
-    return 2 * normal * np.dot(incident, normal) - incident
+    return incident - 2 * normal * np.dot(incident, normal)
 
 def scene_intersection(ray, spheres):
     color = None
@@ -127,10 +127,10 @@ def cast_ray(ray, spheres, lights, depth=0):
         if scene_intersection(Ray(shadow_p, light_dir), spheres): continue
 
         diffuse_intensity += light.intensity * max(0, ln_dot)
-        rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
+        rv_dot = max(0, np.dot(-reflect(-light_dir, normal), ray.v))
         specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
 
-    reflect_dir = -reflect(ray.v, normal)
+    reflect_dir = reflect(ray.v, normal)
     reflect_dir = reflect_dir / np.linalg.norm(reflect_dir)
     rn_dot = np.dot(reflect_dir, normal)
     reflect_p = intersection - offset if rn_dot < 0 else intersection + offset
