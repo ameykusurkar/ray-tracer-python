@@ -208,12 +208,8 @@ for j in range(0, len(framebuffer)):
         ray = Ray(np.array([0, 0, 0]), v)
         framebuffer[j, i] = cast_ray(ray, objects, lights)
 
-for j in range(0, len(framebuffer)):
-    for i in range(0, len(framebuffer[j])):
-        color = framebuffer[j, i]
-        if color.max() > 255:
-            color = color / color.max() * 255
-            framebuffer[j, i] = color
+rgb_max = framebuffer.max(axis=2)[..., np.newaxis]
+framebuffer = np.where(rgb_max > 255, framebuffer / rgb_max * 255, framebuffer)
 
 print(f"Time taken: {time.time()-start:0.2f} seconds")
 im = Image.fromarray(framebuffer.astype(np.uint8))
