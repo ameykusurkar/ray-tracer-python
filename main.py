@@ -15,11 +15,12 @@ BLACK = [0, 0, 0]
 BG_COLOR = [52, 73, 94]
 
 Light = namedtuple("Light", ["pos", "intensity"])
-Material = namedtuple("Material", ["ambient_reflection", "diffuse_reflection", "specular_reflection", "specular_exponent"])
+Material = namedtuple("Material", ["refractive_index", "ambient_reflection", "diffuse_reflection", "specular_reflection", "refraction_constant", "specular_exponent"])
 
-IVORY = Material(0.1, 0.6, 0.3, 50)
-RUBBER = Material(0.0, 0.9, 0.1, 10)
-MIRROR = Material(0.8, 0.0, 10, 1425)
+IVORY = Material(1.0, 0.1, 0.6, 0.3, 0.0, 50)
+RUBBER = Material(1.0, 0.0, 0.9, 0.1, 0.0, 10)
+MIRROR = Material(1.0, 0.8, 0.0, 10, 0.0, 1425)
+GLASS = Material(1.5, 0.1, 0.0, 0.5, 0.8, 125)
 
 REFLECT_DEPTH = 4
 
@@ -61,7 +62,11 @@ class Sphere:
             proj_to_intersect_dist = np.sqrt(
                 np.square(self.radius) - np.square(projection_dist)
             )
-            intersect_dist = np.linalg.norm(projection - ray.p) - proj_to_intersect_dist
+            if np.linalg.norm(ray.p - self.center) < self.radius:
+                # If ray origin is inside the sphere, the intersection will be ahead
+                intersect_dist = np.linalg.norm(projection - ray.p) + proj_to_intersect_dist
+            else:
+                intersect_dist = np.linalg.norm(projection - ray.p) - proj_to_intersect_dist
             intersection = ray.p + (intersect_dist * ray.v)
 
         normal = intersection - self.center
@@ -70,9 +75,9 @@ class Sphere:
 
 spheres = [
     Sphere(np.array([-5, 4, -20]), 2, YELLOW, RUBBER),
-    Sphere(np.array([10, 3, -34]), 4, BLUE, MIRROR),
+    Sphere(np.array([10, 3, -50]), 4, BLUE, MIRROR),
     Sphere(np.array([-2, 5, -40]), 5, RED, IVORY),
-    Sphere(np.array([1, -3, -20]), 3, GREEN, IVORY),
+    Sphere(np.array([-1, 0, -10]), 1, GREEN, GLASS),
 ]
 
 lights = [
@@ -82,6 +87,18 @@ lights = [
 
 def reflect(incident, normal):
     return incident - 2 * normal * np.dot(incident, normal)
+
+def refract(incident, normal, refractive_index):
+    cos_i = -np.dot(incident, normal)
+    refract_ratio = 1 / refractive_index
+
+    if cos_i < 0:
+        cos_i *= -1
+        refract_ratio = 1 / refract_ratio
+
+    # cos_theta_2 in Snell's law
+    cos_r = np.sqrt(1 - np.square(refract_ratio) * (1 - np.square(cos_i)))
+    return refract_ratio * incident + (refract_ratio * cos_i - cos_r) * normal
 
 def scene_intersection(ray, spheres):
     color = None
@@ -132,13 +149,18 @@ def cast_ray(ray, spheres, lights, depth=0):
 
     reflect_dir = reflect(ray.v, normal)
     reflect_dir = reflect_dir / np.linalg.norm(reflect_dir)
-    rn_dot = np.dot(reflect_dir, normal)
-    reflect_p = intersection - offset if rn_dot < 0 else intersection + offset
+    reflect_p = intersection - offset if np.dot(reflect_dir, normal) < 0 else intersection + offset
     reflect_color = cast_ray(Ray(reflect_p, reflect_dir), spheres, lights, depth + 1)
+
+    refract_dir = refract(ray.v, normal, material.refractive_index)
+    refract_dir = refract_dir / np.linalg.norm(refract_dir)
+    refract_p = intersection - offset if np.dot(refract_dir, normal) < 0 else intersection + offset
+    refract_color = cast_ray(Ray(refract_p, refract_dir), spheres, lights, depth + 1)
 
     intensity = diffuse_intensity * np.array(color) * material.diffuse_reflection + \
                 specular_intensity * np.array([255, 255, 255]) * material.specular_reflection + \
-                np.array(reflect_color) * material.ambient_reflection
+                np.array(reflect_color) * material.ambient_reflection + \
+                np.array(refract_color) * material.refraction_constant
 
     return intensity
 
