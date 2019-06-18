@@ -12,12 +12,13 @@ BLUE = [0, 0, 255]
 RED = [255, 0, 0]
 GREEN = [0, 255, 0]
 BLACK = [0, 0, 0]
+WHITE = [255, 255, 255]
 BG_COLOR = [52, 73, 94]
 
 Light = namedtuple("Light", ["pos", "intensity"])
 Material = namedtuple("Material", ["refractive_index", "ambient_reflection", "diffuse_reflection", "specular_reflection", "refraction_constant", "specular_exponent"])
 
-IVORY = Material(1.0, 0.1, 0.6, 0.3, 0.0, 50)
+IVORY = Material(1.0, 0.1, 0.6, 2, 0.0, 200)
 RUBBER = Material(1.0, 0.0, 0.9, 0.1, 0.0, 10)
 MIRROR = Material(1.0, 0.8, 0.0, 10, 0.0, 1425)
 GLASS = Material(1.5, 0.1, 0.0, 0.5, 0.8, 125)
@@ -55,6 +56,16 @@ class Plane:
         intersection = ray.p + (intersect_dist * ray.v)
         return intersection, intersect_dist, self.normal
 
+    def get_color(self, _point):
+        return self.color
+
+class CheckerBoard(Plane):
+    def get_color(self, point):
+        # TODO: This only works for planes of form y = c
+        x_even = np.floor((point[0] - self.p0[0]) / 2) % 2 == 0
+        z_even = np.floor((point[2] - self.p0[2]) / 2) % 2 == 0
+        return BLACK if x_even ^ z_even else WHITE
+
 class Sphere:
     def __init__(self, center, radius, color, material):
         self.center = center
@@ -90,12 +101,15 @@ class Sphere:
         normal = normal / np.linalg.norm(normal)
         return intersection, intersect_dist, normal
 
+    def get_color(self, _point):
+        return self.color
+
 objects = [
+    Sphere(np.array([-6, 1, -40]), 5, RED, IVORY),
     Sphere(np.array([-5, -2, -20]), 2, YELLOW, RUBBER),
-    Sphere(np.array([10, 0, -50]), 4, BLUE, MIRROR),
-    Sphere(np.array([-2, 1, -40]), 5, RED, IVORY),
-    Sphere(np.array([1, -2, -20]), 2, GREEN, GLASS),
-    Plane(np.array([0, -4, 0]), np.array([0, 1, 0]), GREEN, IVORY),
+    Sphere(np.array([10, 0, -30]), 4, BLUE, MIRROR),
+    Sphere(np.array([1, -1, -30]), 3, GREEN, GLASS),
+    CheckerBoard(np.array([0, -4, 0]), np.array([0, 1, 0]), GREEN, IVORY),
 ]
 
 lights = [
@@ -134,7 +148,7 @@ def scene_intersection(ray, objects):
             closest_dist = intersect_dist
             closest_intersection = intersection
             closest_normal = normal
-            color = obj.color
+            color = obj.get_color(intersection)
             material = obj.material
 
     if closest_intersection is None: return None
