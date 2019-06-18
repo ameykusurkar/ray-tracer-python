@@ -12,12 +12,16 @@ BLUE = [0, 0, 255]
 RED = [255, 0, 0]
 GREEN = [0, 255, 0]
 BLACK = [0, 0, 0]
+BG_COLOR = [52, 73, 94]
 
 Light = namedtuple("Light", ["pos", "intensity"])
-Material = namedtuple("Material", ["diffuse_reflection", "specular_reflection", "specular_exponent"])
+Material = namedtuple("Material", ["ambient_reflection", "diffuse_reflection", "specular_reflection", "specular_exponent"])
 
-IVORY = Material(0.6, 0.3, 50)
-RUBBER = Material(0.9, 0.1, 10)
+IVORY = Material(0.1, 0.6, 0.3, 50)
+RUBBER = Material(0.0, 0.9, 0.1, 10)
+MIRROR = Material(0.8, 0.0, 10, 1425)
+
+REFLECT_DEPTH = 4
 
 class Ray:
     def __init__(self, p, v):
@@ -66,9 +70,9 @@ class Sphere:
 
 spheres = [
     Sphere(np.array([-5, 4, -20]), 2, YELLOW, RUBBER),
-    Sphere(np.array([10, 3, -34]), 4, BLUE, RUBBER),
+    Sphere(np.array([10, 3, -34]), 4, BLUE, MIRROR),
     Sphere(np.array([-2, 5, -40]), 5, RED, IVORY),
-    Sphere(np.array([1, -3, -16]), 3, GREEN, IVORY),
+    Sphere(np.array([1, -3, -20]), 3, GREEN, IVORY),
 ]
 
 lights = [
@@ -102,11 +106,14 @@ def scene_intersection(ray, spheres):
 
     return closest_intersection, closest_normal, color, material
 
-def cast_ray(ray, spheres, lights):
+def cast_ray(ray, spheres, lights, depth=0):
+    if depth > REFLECT_DEPTH: return BG_COLOR
+
     result = scene_intersection(ray, spheres)
-    if result is None: return BLACK
+    if result is None: return BG_COLOR
     intersection, normal, color, material = result
 
+    offset = 1e-3 * normal
     diffuse_intensity = 0
     specular_intensity = 0
     for light in lights:
@@ -123,8 +130,15 @@ def cast_ray(ray, spheres, lights):
         rv_dot = max(0, np.dot(reflect(-light_dir, normal), ray.v))
         specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
 
+    reflect_dir = -reflect(ray.v, normal)
+    reflect_dir = reflect_dir / np.linalg.norm(reflect_dir)
+    rn_dot = np.dot(reflect_dir, normal)
+    reflect_p = intersection - offset if rn_dot < 0 else intersection + offset
+    reflect_color = cast_ray(Ray(reflect_p, reflect_dir), spheres, lights, depth + 1)
+
     intensity = diffuse_intensity * np.array(color) * material.diffuse_reflection + \
-                specular_intensity * np.array([255, 255, 255]) * material.specular_reflection
+                specular_intensity * np.array([255, 255, 255]) * material.specular_reflection + \
+                np.array(reflect_color) * material.ambient_reflection
 
     return intensity
 
