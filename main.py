@@ -209,11 +209,13 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
         light_dir = np.divide(light_dir, light_dist, where=(light_dist != 0))
 
         ln_dot = np.multiply(light_dir, normal).sum(axis=1)
-        # shadow_p = intersection - offset if ln_dot < 0 else intersection + offset
-        # if scene_intersection(Ray(shadow_p, light_dir), objects): continue
-
         ln_dot[np.isnan(ln_dot)] = 0
-        diffuse_intensity += light.intensity * np.maximum(0, ln_dot)
+
+        shadow_p = np.where(ln_dot[..., np.newaxis] < 0, intersection - offset, intersection + offset)
+        shadow_intersection, _, _, _ = scene_intersection(shadow_p, light_dir, objects)
+        no_shadow = np.all(np.isinf(shadow_intersection), axis=1)
+
+        diffuse_intensity += np.where(no_shadow, light.intensity * np.maximum(0, ln_dot), 0)
         # rv_dot = max(0, np.dot(-reflect(-light_dir, normal), ray.v))
         # specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
 
