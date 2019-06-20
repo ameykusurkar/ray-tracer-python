@@ -156,12 +156,11 @@ def reflect(incident, normal):
     return incident - 2 * normal * np.multiply(incident, normal).sum(axis=1, keepdims=True)
 
 def refract(incident, normal, refractive_index):
-    cos_i = -np.dot(incident, normal)
-    refract_ratio = 1 / refractive_index
+    cos_i = -np.multiply(incident, normal).sum(axis=1, keepdims=True)
+    refractive_index = refractive_index[..., np.newaxis]
 
-    if cos_i < 0:
-        cos_i *= -1
-        refract_ratio = 1 / refract_ratio
+    cos_i = np.where(cos_i < 0, -cos_i, cos_i)
+    refract_ratio = np.where(cos_i < 0, refractive_index, 1 / refractive_index)
 
     # cos_theta_2 in Snell's law
     cos_r = np.sqrt(1 - np.square(refract_ratio) * (1 - np.square(cos_i)))
@@ -227,20 +226,16 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
     reflect_p = np.where(np.multiply(reflect_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
     reflect_color = cast_ray(reflect_p, reflect_dir, objects, lights, depth + 1)
 
-    # refract_dir = refract(ray.v, normal, material.refractive_index)
-    # refract_dir = refract_dir / np.linalg.norm(refract_dir)
-    # refract_p = intersection - offset if np.dot(refract_dir, normal) < 0 else intersection + offset
-    # refract_color = cast_ray(Ray(refract_p, refract_dir), objects, lights, depth + 1)
-
-    # intensity = diffuse_intensity * np.array(color) * material.diffuse_reflection + \
-                # specular_intensity * np.array([255, 255, 255]) * material.specular_reflection + \
-                # np.array(reflect_color) * material.ambient_reflection + \
-                # np.array(refract_color) * material.refraction_constant
+    refract_dir = refract(ray_dir, normal, np_attr(material, "refractive_index"))
+    refract_dir = refract_dir / np.linalg.norm(refract_dir, axis=1, keepdims=True)
+    refract_p = np.where(np.multiply(refract_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
+    refract_color = cast_ray(refract_p, refract_dir, objects, lights, depth + 1)
 
     # TODO: Find a nicer way to get the diffuse reflection
     intensity = (diffuse_intensity * np_attr(material, "diffuse_reflection"))[..., np.newaxis] * color + \
                 (specular_intensity * np_attr(material, "specular_reflection"))[..., np.newaxis] * np.array(WHITE) + \
-                np_attr(material, "ambient_reflection")[..., np.newaxis] * np.array(reflect_color)
+                np_attr(material, "ambient_reflection")[..., np.newaxis] * np.array(reflect_color) + \
+                np_attr(material, "refraction_constant")[..., np.newaxis] * np.array(refract_color)
 
     return np.where(~np.isinf(intersection), intensity, BG_COLOR)
 
