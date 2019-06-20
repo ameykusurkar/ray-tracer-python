@@ -68,25 +68,28 @@ class Plane:
         self.color = color
         self.material = material
 
-    def ray_intersection(self, ray):
-        vn_dot = np.dot(ray.v, self.normal)
-        if vn_dot == 0: return None
+    # intersection: N, 3
+    # intersect_dist: N
+    # normal: N, 3
+    def ray_intersection(self, ray_p, ray_dir):
+        vn_dot = np.dot(ray_dir, self.normal)
+        # Points parallel to the ray will never project, hence at infinity
+        vn_dot[vn_dot == 0] = INFINITY
+        intersect_dist = np.dot((self.p0 - ray_p), self.normal) / vn_dot
+        # Points behind the ray will never project, hence at infinity
+        intersect_dist[intersect_dist < 0] = INFINITY
+        intersection = ray_p + (intersect_dist[..., np.newaxis] * ray_dir)
+        return intersection, intersect_dist, np.tile(self.normal, (ray_p.shape[0], 1))
 
-        intersect_dist = np.dot((self.p0 - ray.p), self.normal) / vn_dot
-        if intersect_dist < 0: return None
-
-        intersection = ray.p + (intersect_dist * ray.v)
-        return intersection, intersect_dist, self.normal
-
-    def get_color(self, _point):
-        return self.color
+    def get_color(self, points):
+        return np.tile(self.color, (points.shape[0], 1))
 
 class CheckerBoard(Plane):
-    def get_color(self, point):
+    def get_color(self, points):
         # TODO: This only works for planes of form y = c
-        x_even = np.floor((point[0] - self.p0[0]) / 2) % 2 == 0
-        z_even = np.floor((point[2] - self.p0[2]) / 2) % 2 == 0
-        return BLACK if x_even ^ z_even else WHITE
+        x_even = np.floor((points[:, 0] - self.p0[0]) / 2) % 2 == 0
+        z_even = np.floor((points[:, 2] - self.p0[2]) / 2) % 2 == 0
+        return np.where((x_even ^ z_even)[..., np.newaxis], BLACK, WHITE)
 
 class Sphere:
     def __init__(self, center, radius, color, material):
@@ -99,7 +102,6 @@ class Sphere:
     # intersect_dist: N
     # normal: N, 3
     def ray_intersection(self, ray_p, ray_dir):
-        # projection: N, 3; points behind the ray will project at INFINITY
         projection = ray_projection(ray_p, ray_dir, self.center)
         projection_dist = np.linalg.norm(projection - self.center, axis=1)
 
@@ -132,15 +134,15 @@ class Sphere:
         normal = np.divide(normal, normal_dist, where=(normal_dist != 0))
         return intersection, intersect_dist, normal
 
-    def get_color(self, _point):
-        return self.color
+    def get_color(self, points):
+        return np.tile(self.color, (points.shape[0], 1))
 
 objects = [
     Sphere(np.array([-6, 1, -40]), 5, RED, IVORY),
     Sphere(np.array([-5, -2, -20]), 2, YELLOW, RUBBER),
     Sphere(np.array([10, 0, -30]), 4, BLUE, MIRROR),
     Sphere(np.array([1, -1, -30]), 3, GREEN, GLASS),
-    # CheckerBoard(np.array([0, -4, 0]), np.array([0, 1, 0]), GREEN, IVORY),
+    CheckerBoard(np.array([0, -4, 0]), np.array([0, 1, 0]), GREEN, IVORY),
 ]
 
 lights = [
@@ -171,7 +173,6 @@ def refract(incident, normal, refractive_index):
 # closest_normal: N, 3
 # color: N, 3
 # material: N
-# def scene_intersection(ray, objects):
 def scene_intersection(ray_p, ray_dir, objects):
     color                = np.full(ray_p.shape,    BG_COLOR)
     closest_dist         = np.full(ray_p.shape[0], INFINITY)
@@ -186,7 +187,7 @@ def scene_intersection(ray_p, ray_dir, objects):
         closest_dist[new_closest] = intersect_dist[new_closest]
         closest_intersection[new_closest] = intersection[new_closest]
         closest_normal[new_closest] = normal[new_closest]
-        color[new_closest] = obj.get_color(None)
+        color[new_closest] = obj.get_color(intersection)[new_closest]
         material[new_closest] = obj.material
 
     return closest_intersection, closest_normal, color, material
