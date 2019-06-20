@@ -26,6 +26,8 @@ class Material:
         self.refraction_constant = refraction_constant
         self.specular_exponent = specular_exponent
 
+np_attr = np.vectorize(getattr)
+
 IVORY = Material(1.0, 0.1, 0.6, 2, 0.0, 200)
 RUBBER = Material(1.0, 0.0, 0.9, 0.1, 0.0, 10)
 MIRROR = Material(1.0, 0.8, 0.0, 10, 0.0, 1425)
@@ -151,7 +153,7 @@ lights = [
 ]
 
 def reflect(incident, normal):
-    return incident - 2 * normal * np.dot(incident, normal)
+    return incident - 2 * normal * np.multiply(incident, normal).sum(axis=1, keepdims=True)
 
 def refract(incident, normal, refractive_index):
     cos_i = -np.dot(incident, normal)
@@ -202,7 +204,7 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
 
     offset = 1e-3 * normal
     diffuse_intensity = np.zeros(ray_p.shape[0])
-    # specular_intensity = 0
+    specular_intensity = np.zeros(ray_p.shape[0])
     for light in lights:
         light_dir = light.pos - intersection
         light_dist = np.linalg.norm(light_dir, axis=1, keepdims=True)
@@ -216,8 +218,8 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
         no_shadow = np.all(np.isinf(shadow_intersection), axis=1)
 
         diffuse_intensity += np.where(no_shadow, light.intensity * np.maximum(0, ln_dot), 0)
-        # rv_dot = max(0, np.dot(-reflect(-light_dir, normal), ray.v))
-        # specular_intensity += light.intensity * np.power(rv_dot, material.specular_exponent)
+        rv_dot = np.maximum(0, np.multiply(-reflect(-light_dir, normal), ray_dir).sum(axis=1))
+        specular_intensity += np.where(no_shadow, light.intensity * np.power(rv_dot, np_attr(material, "specular_exponent")), 0)
 
     # reflect_dir = reflect(ray.v, normal)
     # reflect_dir = reflect_dir / np.linalg.norm(reflect_dir)
@@ -235,14 +237,10 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
                 # np.array(refract_color) * material.refraction_constant
 
     # TODO: Find a nicer way to get the diffuse reflection
-    diffuse_reflection = np.vectorize(getattr)
-    intensity = np.where(
-        ~np.isinf(intersection),
-        (diffuse_intensity * diffuse_reflection(material, "diffuse_reflection"))[..., np.newaxis] * color,
-        BG_COLOR
-    )
+    intensity = (diffuse_intensity * np_attr(material, "diffuse_reflection"))[..., np.newaxis] * color + \
+                (specular_intensity * np_attr(material, "specular_reflection"))[..., np.newaxis] * np.array(WHITE)
 
-    return intensity
+    return np.where(~np.isinf(intersection), intensity, BG_COLOR)
 
 start = time.time()
 
