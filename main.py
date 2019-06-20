@@ -198,7 +198,8 @@ def scene_intersection(ray_p, ray_dir, objects):
 # ray_p: N, 3
 # return: N, 3 (the 3 RGB channels)
 def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
-    # if depth > REFLECT_DEPTH: return BG_COLOR
+    if depth > REFLECT_DEPTH:
+        return np.tile(BG_COLOR, (ray_p.shape[0], 1))
 
     intersection, normal, color, material = scene_intersection(ray_p, ray_dir, objects)
 
@@ -221,10 +222,10 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
         rv_dot = np.maximum(0, np.multiply(-reflect(-light_dir, normal), ray_dir).sum(axis=1))
         specular_intensity += np.where(no_shadow, light.intensity * np.power(rv_dot, np_attr(material, "specular_exponent")), 0)
 
-    # reflect_dir = reflect(ray.v, normal)
-    # reflect_dir = reflect_dir / np.linalg.norm(reflect_dir)
-    # reflect_p = intersection - offset if np.dot(reflect_dir, normal) < 0 else intersection + offset
-    # reflect_color = cast_ray(Ray(reflect_p, reflect_dir), objects, lights, depth + 1)
+    reflect_dir = reflect(ray_dir, normal)
+    reflect_dir = reflect_dir / np.linalg.norm(reflect_dir, axis=1, keepdims=True)
+    reflect_p = np.where(np.multiply(reflect_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
+    reflect_color = cast_ray(reflect_p, reflect_dir, objects, lights, depth + 1)
 
     # refract_dir = refract(ray.v, normal, material.refractive_index)
     # refract_dir = refract_dir / np.linalg.norm(refract_dir)
@@ -238,7 +239,8 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
 
     # TODO: Find a nicer way to get the diffuse reflection
     intensity = (diffuse_intensity * np_attr(material, "diffuse_reflection"))[..., np.newaxis] * color + \
-                (specular_intensity * np_attr(material, "specular_reflection"))[..., np.newaxis] * np.array(WHITE)
+                (specular_intensity * np_attr(material, "specular_reflection"))[..., np.newaxis] * np.array(WHITE) + \
+                np_attr(material, "ambient_reflection")[..., np.newaxis] * np.array(reflect_color)
 
     return np.where(~np.isinf(intersection), intensity, BG_COLOR)
 
