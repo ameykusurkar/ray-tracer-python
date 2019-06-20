@@ -246,23 +246,18 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
 
 start = time.time()
 
-framebuffer = np.zeros((HEIGHT, WIDTH, 3))
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
-ray_p = np.zeros((HEIGHT, WIDTH, 3))
+i = np.arange(WIDTH).reshape(1, WIDTH)
+j = np.arange(HEIGHT).reshape(HEIGHT, 1)
+ray_dir[:, :, 0] =  (2 * (i + 0.5)/WIDTH  - 1) * np.tan(FOV/2) * WIDTH / HEIGHT
+ray_dir[:, :, 1] = -(2 * (j + 0.5)/HEIGHT - 1) * np.tan(FOV/2)
+ray_dir[:, :, 2] = -1
+ray_dir = ray_dir / np.linalg.norm(ray_dir, axis=2, keepdims=True)
 
-for j in range(0, len(framebuffer)):
-    for i in range(0, len(framebuffer[j])):
-        x =  (2 * (i + 0.5)/WIDTH  - 1) * np.tan(FOV/2) * WIDTH / HEIGHT
-        y = -(2 * (j + 0.5)/HEIGHT - 1) * np.tan(FOV/2)
-        v = np.array([x, y, -1])
-        v = v / np.linalg.norm(v)
-        ray = Ray(np.array([0, 0, 0]), v)
-        ray_dir[j, i] = v
-        ray_p[j, i] = [0, 0, 0]
+ray_p = np.zeros((HEIGHT, WIDTH, 3))
 
 framebuffer = cast_ray(ray_p.reshape(-1, 3), ray_dir.reshape(-1, 3), objects, lights)
 framebuffer = framebuffer.reshape(HEIGHT, WIDTH, 3)
-
 rgb_max = framebuffer.max(axis=2)[..., np.newaxis]
 framebuffer = np.where(rgb_max > 255, np.divide(framebuffer, rgb_max, where=(rgb_max != 0)) * 255, framebuffer)
 
