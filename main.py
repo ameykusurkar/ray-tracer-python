@@ -49,6 +49,10 @@ def ray_projection(ray_p, ray_dir, point):
     proj_dist = uv_dot / np.linalg.norm(ray_dir, axis=1, keepdims=True)
     return ray_p + proj_dist * ray_dir
 
+def normalize(v):
+    v_mag = np.linalg.norm(v, axis=1, keepdims=True)
+    return np.divide(v, v_mag, where=(v_mag > 0))
+
 class Ray:
     def __init__(self, p, v):
         self.p = p
@@ -77,7 +81,7 @@ class Plane:
         vn_dot = np.dot(ray_dir, self.normal)
         # Points parallel to the ray will never project, hence at infinity
         vn_dot[vn_dot == 0] = INFINITY
-        intersect_dist = np.dot((self.p0 - ray_p), self.normal) / vn_dot
+        intersect_dist = np.dot(self.p0 - ray_p, self.normal) / vn_dot
         # Points behind the ray will never project, hence at infinity
         intersect_dist[intersect_dist < 0] = INFINITY
         intersection = ray_p + (intersect_dist[..., np.newaxis] * ray_dir)
@@ -131,9 +135,7 @@ class Sphere:
         )
         intersection[projection_dist < self.radius] = (ray_p + (intersect_dist[..., np.newaxis] * ray_dir))[projection_dist < self.radius]
 
-        normal = intersection - self.center
-        normal_dist = np.linalg.norm(normal, axis=1, keepdims=True)
-        normal = np.divide(normal, normal_dist, where=(normal_dist != 0))
+        normal = normalize(intersection - self.center)
         return intersection, intersect_dist, normal
 
     def get_color(self, points):
@@ -185,11 +187,11 @@ def scene_intersection(ray_p, ray_dir, objects):
         intersection, intersect_dist, normal = obj.ray_intersection(ray_p, ray_dir)
         new_closest = intersect_dist < closest_dist
 
-        closest_dist[new_closest] = intersect_dist[new_closest]
+        closest_dist[new_closest]         = intersect_dist[new_closest]
         closest_intersection[new_closest] = intersection[new_closest]
-        closest_normal[new_closest] = normal[new_closest]
-        color[new_closest] = obj.get_color(intersection)[new_closest]
-        material[new_closest] = obj.material
+        closest_normal[new_closest]       = normal[new_closest]
+        color[new_closest]                = obj.get_color(intersection)[new_closest]
+        material[new_closest]             = obj.material
 
     return closest_intersection, closest_normal, color, material
 
@@ -206,9 +208,7 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
     diffuse_intensity = np.zeros(ray_p.shape[0])
     specular_intensity = np.zeros(ray_p.shape[0])
     for light in lights:
-        light_dir = light.pos - intersection
-        light_dist = np.linalg.norm(light_dir, axis=1, keepdims=True)
-        light_dir = np.divide(light_dir, light_dist, where=(light_dist != 0))
+        light_dir = normalize(light.pos - intersection)
 
         ln_dot = np.multiply(light_dir, normal).sum(axis=1)
         ln_dot[np.isnan(ln_dot)] = 0
@@ -221,13 +221,11 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
         rv_dot = np.maximum(0, np.multiply(-reflect(-light_dir, normal), ray_dir).sum(axis=1))
         specular_intensity += np.where(no_shadow, light.intensity * np.power(rv_dot, np_attr(material, "specular_exponent")), 0)
 
-    reflect_dir = reflect(ray_dir, normal)
-    reflect_dir = reflect_dir / np.linalg.norm(reflect_dir, axis=1, keepdims=True)
+    reflect_dir = normalize(reflect(ray_dir, normal))
     reflect_p = np.where(np.multiply(reflect_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
     reflect_color = cast_ray(reflect_p, reflect_dir, objects, lights, depth + 1)
 
-    refract_dir = refract(ray_dir, normal, np_attr(material, "refractive_index"))
-    refract_dir = refract_dir / np.linalg.norm(refract_dir, axis=1, keepdims=True)
+    refract_dir = normalize(refract(ray_dir, normal, np_attr(material, "refractive_index")))
     refract_p = np.where(np.multiply(refract_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
     refract_color = cast_ray(refract_p, refract_dir, objects, lights, depth + 1)
 
@@ -247,13 +245,13 @@ j = np.arange(HEIGHT).reshape(HEIGHT, 1)
 ray_dir[:, :, 0] =  (2 * (i + 0.5)/WIDTH  - 1) * np.tan(FOV/2) * WIDTH / HEIGHT
 ray_dir[:, :, 1] = -(2 * (j + 0.5)/HEIGHT - 1) * np.tan(FOV/2)
 ray_dir[:, :, 2] = -1
-ray_dir = ray_dir / np.linalg.norm(ray_dir, axis=2, keepdims=True)
 
-ray_p = np.zeros((HEIGHT, WIDTH, 3))
+ray_dir = normalize(ray_dir.reshape(-1, 3))
+ray_p = np.zeros((HEIGHT * WIDTH, 3))
 
-framebuffer = cast_ray(ray_p.reshape(-1, 3), ray_dir.reshape(-1, 3), objects, lights)
+framebuffer = cast_ray(ray_p, ray_dir, objects, lights)
 framebuffer = framebuffer.reshape(HEIGHT, WIDTH, 3)
-rgb_max = framebuffer.max(axis=2)[..., np.newaxis]
+rgb_max = framebuffer.max(axis=2, keepdims=True)
 framebuffer = np.where(rgb_max > 255, np.divide(framebuffer, rgb_max, where=(rgb_max != 0)) * 255, framebuffer)
 
 print(f"Time taken: {time.time()-start:0.2f} seconds")
