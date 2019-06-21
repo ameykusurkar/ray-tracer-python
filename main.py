@@ -213,21 +213,18 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
         ln_dot = np.multiply(light_dir, normal).sum(axis=1)
         ln_dot[np.isnan(ln_dot)] = 0
 
-        shadow_p = np.where(ln_dot[..., np.newaxis] < 0, intersection - offset, intersection + offset)
-        shadow_intersection, _, _, _ = scene_intersection(shadow_p, light_dir, objects)
+        shadow_intersection, _, _, _ = scene_intersection(intersection + offset, light_dir, objects)
         no_shadow = np.all(np.isinf(shadow_intersection), axis=1)
 
         diffuse_intensity += np.where(no_shadow, light.intensity * np.maximum(0, ln_dot), 0)
-        rv_dot = np.maximum(0, np.multiply(-reflect(-light_dir, normal), ray_dir).sum(axis=1))
+        rv_dot = np.maximum(0, np.multiply(reflect(light_dir, normal), ray_dir).sum(axis=1))
         specular_intensity += np.where(no_shadow, light.intensity * np.power(rv_dot, np_attr(material, "specular_exponent")), 0)
 
     reflect_dir = normalize(reflect(ray_dir, normal))
-    reflect_p = np.where(np.multiply(reflect_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
-    reflect_color = cast_ray(reflect_p, reflect_dir, objects, lights, depth + 1)
+    reflect_color = cast_ray(intersection + offset, reflect_dir, objects, lights, depth + 1)
 
     refract_dir = normalize(refract(ray_dir, normal, np_attr(material, "refractive_index")))
-    refract_p = np.where(np.multiply(refract_dir, normal).sum(axis=1, keepdims=True) < 0, intersection - offset, intersection + offset)
-    refract_color = cast_ray(refract_p, refract_dir, objects, lights, depth + 1)
+    refract_color = cast_ray(intersection - offset, refract_dir, objects, lights, depth + 1)
 
     # TODO: Find a nicer way to get the diffuse reflection
     intensity = (diffuse_intensity * np_attr(material, "diffuse_reflection"))[..., np.newaxis] * color + \
