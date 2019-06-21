@@ -53,20 +53,6 @@ def normalize(v):
     v_mag = np.linalg.norm(v, axis=1, keepdims=True)
     return np.divide(v, v_mag, where=(v_mag > 0))
 
-class Ray:
-    def __init__(self, p, v):
-        self.p = p
-        self.v = v
-
-    def projection(self, point):
-        u = point - self.p
-        uv_dot = np.dot(self.v, u)
-        if uv_dot <= 0:
-            # Point does not project onto the ray
-            return None
-        proj_vector = (uv_dot / np.linalg.norm(ray.v)) * self.v
-        return self.p + proj_vector
-
 class Plane:
     def __init__(self, p0, normal, color, material):
         self.p0 = p0
@@ -210,13 +196,12 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
     for light in lights:
         light_dir = normalize(light.pos - intersection)
 
-        ln_dot = np.multiply(light_dir, normal).sum(axis=1)
-        ln_dot[np.isnan(ln_dot)] = 0
-
         shadow_intersection, _, _, _ = scene_intersection(intersection + offset, light_dir, objects)
         no_shadow = np.all(np.isinf(shadow_intersection), axis=1)
 
-        diffuse_intensity += np.where(no_shadow, light.intensity * np.maximum(0, ln_dot), 0)
+        ln_dot = np.maximum(0, np.multiply(light_dir, normal).sum(axis=1))
+        diffuse_intensity += np.where(no_shadow, light.intensity * ln_dot, 0)
+
         rv_dot = np.maximum(0, np.multiply(reflect(light_dir, normal), ray_dir).sum(axis=1))
         specular_intensity += np.where(no_shadow, light.intensity * np.power(rv_dot, np_attr(material, "specular_exponent")), 0)
 
