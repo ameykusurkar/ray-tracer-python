@@ -26,7 +26,7 @@ class Material:
         self.refraction_constant = refraction_constant
         self.specular_exponent = specular_exponent
 
-np_attr = np.vectorize(getattr)
+np_attr = np.vectorize(getattr, otypes=[float])
 
 IVORY = Material(1.0, 0.1, 0.6, 2, 0.0, 200)
 RUBBER = Material(1.0, 0.0, 0.9, 0.1, 0.0, 10)
@@ -40,7 +40,6 @@ REFLECT_DEPTH = 4
 # ray_p: N, 3
 # point: 3
 # return: N, 3 (projection)
-# Points behind the ray will project at INFINITY
 def ray_projection(ray_p, ray_dir, point):
     u = point - ray_p
     uv_dot = np.multiply(ray_dir, u).sum(axis=1, keepdims=True)
@@ -60,9 +59,6 @@ class Plane:
         self.color = color
         self.material = material
 
-    # intersection: N, 3
-    # intersect_dist: N
-    # normal: N, 3
     def ray_intersection(self, ray_p, ray_dir):
         vn_dot = np.dot(ray_dir, self.normal)
         # Points parallel to the ray will never project, hence at infinity
@@ -90,9 +86,6 @@ class Sphere:
         self.color = color
         self.material = material
 
-    # intersection: N, 3
-    # intersect_dist: N
-    # normal: N, 3
     def ray_intersection(self, ray_p, ray_dir):
         projection = ray_projection(ray_p, ray_dir, self.center)
         projection_dist = np.linalg.norm(projection - self.center, axis=1)
@@ -154,14 +147,6 @@ def refract(incident, normal, refractive_index):
     cos_r = np.sqrt(1 - np.square(refract_ratio) * (1 - np.square(cos_i)))
     return refract_ratio * incident + (refract_ratio * cos_i - cos_r) * normal
 
-
-# ray_dir: N, 3
-# ray_p: N, 3
-# OUT:
-# closest_intersection: N, 3
-# closest_normal: N, 3
-# color: N, 3
-# material: N
 def scene_intersection(ray_p, ray_dir, objects):
     color                = np.full(ray_p.shape,    BG_COLOR)
     closest_dist         = np.full(ray_p.shape[0], INFINITY)
@@ -181,18 +166,23 @@ def scene_intersection(ray_p, ray_dir, objects):
 
     return closest_intersection, closest_normal, color, material
 
-# ray_dir: N, 3
-# ray_p: N, 3
-# return: N, 3 (the 3 RGB channels)
 def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
     if depth > REFLECT_DEPTH:
         return np.tile(BG_COLOR, (ray_p.shape[0], 1))
 
     intersection, normal, color, material = scene_intersection(ray_p, ray_dir, objects)
 
+    # Only compute light intensities at points where rays hit an object
+    hit = ~np.isinf(intersection)
+    intersection = np.extract(hit, intersection).reshape(-1, 3)
+    normal = np.extract(hit, normal).reshape(-1, 3)
+    color = np.extract(hit, color).reshape(-1, 3)
+    material = np.extract(hit[:, 0], material)
+    ray_dir = np.extract(hit, ray_dir).reshape(-1, 3)
+
     offset = 1e-3 * normal
-    diffuse_intensity = np.zeros(ray_p.shape[0])
-    specular_intensity = np.zeros(ray_p.shape[0])
+    diffuse_intensity = np.zeros(ray_dir.shape[0])
+    specular_intensity = np.zeros(ray_dir.shape[0])
     for light in lights:
         light_dir = normalize(light.pos - intersection)
 
@@ -211,13 +201,15 @@ def cast_ray(ray_p, ray_dir, objects, lights, depth=0):
     refract_dir = normalize(refract(ray_dir, normal, np_attr(material, "refractive_index")))
     refract_color = cast_ray(intersection - offset, refract_dir, objects, lights, depth + 1)
 
-    # TODO: Find a nicer way to get the diffuse reflection
     intensity = (diffuse_intensity * np_attr(material, "diffuse_reflection"))[..., np.newaxis] * color + \
                 (specular_intensity * np_attr(material, "specular_reflection"))[..., np.newaxis] * np.array(WHITE) + \
                 np_attr(material, "ambient_reflection")[..., np.newaxis] * np.array(reflect_color) + \
                 np_attr(material, "refraction_constant")[..., np.newaxis] * np.array(refract_color)
 
-    return np.where(~np.isinf(intersection), intensity, BG_COLOR)
+    intensity_with_background = np.full(ray_p.shape, BG_COLOR, dtype=np.float)
+    np.place(intensity_with_background, hit, intensity)
+
+    return intensity_with_background
 
 start = time.time()
 
