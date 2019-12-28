@@ -31,7 +31,7 @@ ray_p = np.zeros((HEIGHT * WIDTH, 3))
 
 sphere = Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0])
 
-pixels = color(ray_p, ray_dir, sphere) * 255
+pixels = color(ray_p, normalize(ray_dir), sphere) * 255
 pixels = pixels.reshape(HEIGHT, WIDTH, 3).astype(np.uint8)
 
 im = Image.fromarray(pixels)
