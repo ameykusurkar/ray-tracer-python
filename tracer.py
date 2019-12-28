@@ -16,9 +16,10 @@ def color(ray_p, ray_dir):
 
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
 
-ray_dir[:, :, 0] = np.linspace(0, 1, WIDTH)
+ASPECT_RATIO = WIDTH / HEIGHT
+ray_dir[:, :, 0] = np.linspace(-ASPECT_RATIO, ASPECT_RATIO, WIDTH)
 # We want the the y-coord to increase upwards
-ray_dir[:, :, 1] = np.linspace(1, 0, HEIGHT).reshape(-1, 1)
+ray_dir[:, :, 1] = np.linspace(1, -1, HEIGHT).reshape(-1, 1)
 ray_dir[:, :, 2] = -1
 
 # Even though the pixels have the dimensions H x W x 3, we can think of
