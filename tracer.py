@@ -12,8 +12,8 @@ def compute_background(ray_p, ray_dir):
 
 def color(ray_p, ray_dir, sphere):
     background = compute_background(ray_p, ray_dir)
-    intersection, _, _ = sphere.ray_intersection(ray_p, ray_dir)
-    return np.where(intersection < INFINITY, sphere.color, background)
+    intersection, _, normal = sphere.ray_intersection(ray_p, ray_dir)
+    return np.where(intersection < INFINITY, (normal + 1) * 0.5, background)
 
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
 
