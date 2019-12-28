@@ -1,13 +1,8 @@
 from PIL import Image
 import numpy as np
-from sphere import Sphere, INFINITY
+from sphere import Sphere, INFINITY, normalize
 
 WIDTH, HEIGHT = 200, 100
-
-def normalize(v):
-    last_dim = v.ndim - 1
-    v_mag = np.linalg.norm(v, axis=last_dim, keepdims=True)
-    return np.divide(v, v_mag, where=(v_mag > 0))
 
 def compute_background(ray_p, ray_dir):
     unit_direction = normalize(ray_dir)
