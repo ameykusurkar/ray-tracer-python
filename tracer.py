@@ -1,5 +1,6 @@
 from PIL import Image
 import numpy as np
+from sphere import Sphere, INFINITY
 
 WIDTH, HEIGHT = 200, 100
 
@@ -8,11 +9,16 @@ def normalize(v):
     v_mag = np.linalg.norm(v, axis=last_dim, keepdims=True)
     return np.divide(v, v_mag, where=(v_mag > 0))
 
-def color(ray_p, ray_dir):
+def compute_background(ray_p, ray_dir):
     unit_direction = normalize(ray_dir)
     t = 0.5 * (unit_direction[:, 1] + 1)
     t = t[..., np.newaxis]
     return (1 - t) * [1.0, 1.0, 1.0] + t * [0.5, 0.7, 1.0]
+
+def color(ray_p, ray_dir, sphere):
+    background = compute_background(ray_p, ray_dir)
+    intersection, _, _ = sphere.ray_intersection(ray_p, ray_dir)
+    return np.where(intersection < INFINITY, sphere.color, background)
 
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
 
@@ -28,7 +34,9 @@ ray_dir[:, :, 2] = -1
 ray_dir = ray_dir.reshape(-1, 3)
 ray_p = np.zeros((HEIGHT * WIDTH, 3))
 
-pixels = color(ray_p, ray_dir) * 255
+sphere = Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0])
+
+pixels = color(ray_p, ray_dir, sphere) * 255
 pixels = pixels.reshape(HEIGHT, WIDTH, 3).astype(np.uint8)
 
 im = Image.fromarray(pixels)
