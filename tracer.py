@@ -1,6 +1,6 @@
 from PIL import Image
 import numpy as np
-from sphere import Sphere, INFINITY, normalize
+from sphere import HittableList, Sphere, INFINITY, normalize
 
 WIDTH, HEIGHT = 200, 100
 
@@ -10,9 +10,9 @@ def compute_background(ray_p, ray_dir):
     t = t[..., np.newaxis]
     return (1 - t) * [1.0, 1.0, 1.0] + t * [0.5, 0.7, 1.0]
 
-def color(ray_p, ray_dir, sphere):
+def color(ray_p, ray_dir, hittable):
     background = compute_background(ray_p, ray_dir)
-    intersection, _, normal = sphere.ray_intersection(ray_p, ray_dir)
+    intersection, _, normal = hittable.ray_intersection(ray_p, ray_dir)
     return np.where(intersection < INFINITY, (normal + 1) * 0.5, background)
 
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
@@ -29,9 +29,12 @@ ray_dir[:, :, 2] = -1
 ray_dir = ray_dir.reshape(-1, 3)
 ray_p = np.zeros((HEIGHT * WIDTH, 3))
 
-sphere = Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0])
+hittable_list = HittableList([
+    Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0]),
+    Sphere(np.array([0, -100.5, -1]), 100, [1, 0, 0]),
+])
 
-pixels = color(ray_p, normalize(ray_dir), sphere) * 255
+pixels = color(ray_p, normalize(ray_dir), hittable_list) * 255
 pixels = pixels.reshape(HEIGHT, WIDTH, 3).astype(np.uint8)
 
 im = Image.fromarray(pixels)

@@ -2,6 +2,25 @@ import numpy as np
 
 INFINITY = float("inf")
 
+class HittableList:
+    def __init__(self, hittables):
+        self.hittables = hittables
+
+    def ray_intersection(self, ray_p, ray_dir):
+        closest_dist         = np.full(ray_p.shape[0], INFINITY)
+        closest_intersection = np.full(ray_p.shape,    INFINITY)
+        closest_normal       = np.full(ray_p.shape,    INFINITY)
+
+        for hittable in self.hittables:
+            intersection, intersect_dist, normal = hittable.ray_intersection(ray_p, ray_dir)
+            new_closest = intersect_dist < closest_dist
+            closest_dist[new_closest]         = intersect_dist[new_closest]
+            closest_intersection[new_closest] = intersection[new_closest]
+            closest_normal[new_closest]       = normal[new_closest]
+
+        return closest_intersection, closest_dist, closest_normal
+
+
 class Sphere:
     def __init__(self, center, radius, color):
         self.center = center
