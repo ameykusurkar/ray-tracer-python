@@ -1,6 +1,7 @@
 from PIL import Image
 import numpy as np
 from sphere import HittableList, Sphere, INFINITY, normalize
+from camera import Camera
 
 WIDTH, HEIGHT = 200, 100
 
@@ -17,25 +18,23 @@ def color(ray_p, ray_dir, hittable):
 
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
 
-ASPECT_RATIO = WIDTH / HEIGHT
-ray_dir[:, :, 0] = np.linspace(-ASPECT_RATIO, ASPECT_RATIO, WIDTH)
-# We want the the y-coord to increase upwards
-ray_dir[:, :, 1] = np.linspace(1, -1, HEIGHT).reshape(-1, 1)
-ray_dir[:, :, 2] = -1
-
-# Even though the pixels have the dimensions H x W x 3, we can think of
-# them as (H x W) number of rays, reducing the number for dimensions
-# while calculating.
-ray_dir = ray_dir.reshape(-1, 3)
-ray_p = np.zeros((HEIGHT * WIDTH, 3))
-
 hittable_list = HittableList([
     Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0]),
     Sphere(np.array([0, -100.5, -1]), 100, [1, 0, 0]),
 ])
 
+camera = Camera(HEIGHT, WIDTH)
+
+ray_p, ray_dir = camera.get_initial_rays()
+
+# Even though the pixels have the dimensions H x W x 3, we can think of
+# them as (H x W) number of rays, reducing the number for dimensions
+# while calculating.
+ray_dir = ray_dir.reshape(-1, 3)
+ray_p = ray_p.reshape(-1, 3)
+
 pixels = color(ray_p, normalize(ray_dir), hittable_list) * 255
-pixels = pixels.reshape(HEIGHT, WIDTH, 3).astype(np.uint8)
+pixels = pixels.reshape(camera.height, camera.width, 3).astype(np.uint8)
 
 im = Image.fromarray(pixels)
 im.save("output.png")
