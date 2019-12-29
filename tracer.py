@@ -16,6 +16,11 @@ def color(ray_p, ray_dir, hittable):
     intersection, _, normal = hittable.ray_intersection(ray_p, ray_dir)
     return np.where(intersection < INFINITY, (normal + 1) * 0.5, background)
 
+def scale_down_pixels(pixels, factor):
+    h, w, _ = pixels.shape
+    new_h, new_w = int(h / factor), int(w / factor)
+    return pixels.reshape(new_h, factor, new_w, factor, 3).mean(axis=(1, 3))
+
 ray_dir = np.zeros((HEIGHT, WIDTH, 3))
 
 hittable_list = HittableList([
@@ -23,7 +28,8 @@ hittable_list = HittableList([
     Sphere(np.array([0, -100.5, -1]), 100, [1, 0, 0]),
 ])
 
-camera = Camera(HEIGHT, WIDTH)
+ANTI_ALIASING_FACTOR = 4
+camera = Camera(HEIGHT * ANTI_ALIASING_FACTOR, WIDTH * ANTI_ALIASING_FACTOR)
 
 ray_p, ray_dir = camera.get_initial_rays()
 
@@ -33,8 +39,10 @@ ray_p, ray_dir = camera.get_initial_rays()
 ray_dir = ray_dir.reshape(-1, 3)
 ray_p = ray_p.reshape(-1, 3)
 
-pixels = color(ray_p, normalize(ray_dir), hittable_list) * 255
-pixels = pixels.reshape(camera.height, camera.width, 3).astype(np.uint8)
+pixels = color(ray_p, normalize(ray_dir), hittable_list)
+pixels = pixels.reshape(camera.height, camera.width, 3)
+pixels = scale_down_pixels(pixels, ANTI_ALIASING_FACTOR)
+pixels = (pixels * 255).astype(np.uint8)
 
 im = Image.fromarray(pixels)
 im.save("output.png")
