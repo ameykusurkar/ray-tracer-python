@@ -1,5 +1,7 @@
 from PIL import Image
 import numpy as np
+import time
+
 from sphere import HittableList, Sphere, INFINITY, normalize
 from camera import Camera
 
@@ -65,7 +67,12 @@ ray_p, ray_dir = camera.get_initial_rays()
 ray_dir = ray_dir.reshape(-1, 3)
 ray_p = ray_p.reshape(-1, 3)
 
+start = time.time()
+
 pixels = color(ray_p, normalize(ray_dir), hittable_list)
+
+print(f"Time taken: {time.time()-start:0.2f} seconds, Resolution: {WIDTH} x {HEIGHT}")
+
 pixels = pixels.reshape(camera.height, camera.width, 3)
 pixels = scale_down_pixels(pixels, ANTI_ALIASING_FACTOR)
 pixels = (pixels * 255).astype(np.uint8)
