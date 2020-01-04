@@ -65,12 +65,17 @@ class Sphere:
 
 
 def ray_projection(ray_p, ray_dir, point):
-    u = point - ray_p
-    uv_dot = np.multiply(ray_dir, u).sum(axis=1, keepdims=True)
-    # Points behind the ray will never project, hence at infinity
+    u, v = point - ray_p, ray_dir
+    return ray_p + vector_projection(u, v)
+
+def vector_projection(u, v):
+    uv_dot = np.multiply(u, v).sum(axis=1, keepdims=True)
+    # TODO: We are going to assume for now that the sphere's centre
+    # will never be behind the ray origin, so we can safely put the
+    # distance as infinity. However, we should account for that case.
     uv_dot[uv_dot <= 0] = INFINITY
-    dist_from_ray_origin = uv_dot / np.linalg.norm(ray_dir, axis=1, keepdims=True)
-    return ray_p + dist_from_ray_origin * ray_dir
+    v_mag = np.linalg.norm(v, axis=1, keepdims=True)
+    return (uv_dot / v_mag) * v
 
 # TODO: Move this to a more sensible place
 def normalize(v):

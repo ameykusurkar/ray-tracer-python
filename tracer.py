@@ -23,7 +23,9 @@ def color(ray_p, ray_dir, hittable):
     if not np.any(has_hit):
         return colors
 
-    diffuse_p = intersection[has_hit]
+    # Add some outward bias, so that the reflected ray does not intersect
+    # the object it just reflected off
+    diffuse_p = intersection[has_hit] + 1e-3 * normal[has_hit]
     diffuse_dir = normalize(normal[has_hit] + random_in_unit_sphere(np.count_nonzero(has_hit)))
 
     colors[has_hit] = 0.5 * color(diffuse_p, diffuse_dir, hittable)
