@@ -18,19 +18,19 @@ def fill_background(ray_p, ray_dir):
 def color(ray_p, ray_dir, hittable):
     colors = fill_background(ray_p, ray_dir)
 
-    intersection, intersect_dist, normal, material = hittable.ray_intersection(ray_p, ray_dir)
+    intersection, intersect_dist, normal, material, attenuation = hittable.ray_intersection(ray_p, ray_dir)
     has_hit = intersect_dist < INFINITY
 
     if not np.any(has_hit):
         return colors
 
-    scatter_p, scatter_dir, attenuation = scatter(
+    scatter_p, scatter_dir = scatter(
         material[has_hit],
         ray_p[has_hit], ray_dir[has_hit],
         intersection[has_hit], normal[has_hit],
     )
 
-    colors[has_hit] = attenuation * color(scatter_p, scatter_dir, hittable)
+    colors[has_hit] = attenuation[has_hit] * color(scatter_p, scatter_dir, hittable)
     return colors
 
 def scale_down_pixels(pixels, factor):
@@ -42,7 +42,7 @@ hittable_list = HittableList([
     Sphere(np.array([0, 0, -1]), 0.5, Lambertian([0.8, 0.3, 0.3])),
     Sphere(np.array([-1, 0, -1]), 0.5, Metal([0.8, 0.8, 0.8])),
     Sphere(np.array([1, 0, -1]), 0.5, Metal([0.8, 0.6, 0.2])),
-    Sphere(np.array([0, -100.5, -1]), 100, Metal([0.8, 0.8, 0.0])),
+    Sphere(np.array([0, -100.5, -1]), 100, Lambertian([0.8, 0.8, 0.0])),
 ])
 
 ANTI_ALIASING_FACTOR = 4

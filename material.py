@@ -2,14 +2,13 @@ import numpy as np
 from sphere import normalize
 
 # TODO: Vectorise this. This needs to be faster to scale.
-def scatter(material, ray_p, ray_dir, intersection, normal):
+def scatter(material_types, ray_p, ray_dir, intersection, normal):
     scatter_p = np.zeros(normal.shape)
     scatter_dir = np.zeros(normal.shape)
-    albedo = np.zeros(normal.shape)
 
-    for mat in set(material):
-        curr_material = material == mat
-        sctr_p, sctr_dir, alb = mat.scatter(
+    for mat_type in set(material_types):
+        curr_material = material_types == mat_type
+        sctr_p, sctr_dir = mat_type.scatter(
             ray_p[curr_material],
             ray_dir[curr_material],
             intersection[curr_material],
@@ -17,30 +16,32 @@ def scatter(material, ray_p, ray_dir, intersection, normal):
         )
         scatter_p[curr_material] = sctr_p
         scatter_dir[curr_material] = sctr_dir
-        albedo[curr_material] = alb
-    return scatter_p, scatter_dir, albedo
+
+    return scatter_p, scatter_dir
 
 class Lambertian:
     def __init__(self, albedo):
         self.albedo = albedo
 
-    def scatter(self, ray_p, ray_dir, intersection, normal):
+    @staticmethod
+    def scatter(ray_p, ray_dir, intersection, normal):
         # Add some outward bias, so that the reflected ray does not intersect
         # the object it just reflected off
         scatter_p = intersection + 1e-3 * normal
         scatter_dir = normalize(normal + random_in_unit_sphere(normal.shape[0]))
-        return scatter_p, scatter_dir, self.albedo
+        return scatter_p, scatter_dir
 
 class Metal:
     def __init__(self, albedo):
         self.albedo = albedo
 
-    def scatter(self, ray_p, ray_dir, intersection, normal):
+    @staticmethod
+    def scatter(ray_p, ray_dir, intersection, normal):
         # Add some outward bias, so that the reflected ray does not intersect
         # the object it just reflected off
         scatter_p = intersection + 1e-3 * normal
         scatter_dir = reflect(ray_dir, normal)
-        return scatter_p, scatter_dir, self.albedo
+        return scatter_p, scatter_dir
 
 def random_in_unit_sphere(n):
     result = get_random_coords(n)
