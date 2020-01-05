@@ -10,6 +10,7 @@ class HittableList:
         closest_dist         = np.full(ray_p.shape[0], INFINITY)
         closest_intersection = np.full(ray_p.shape,    INFINITY)
         closest_normal       = np.full(ray_p.shape,    INFINITY)
+        closest_material     = np.full(ray_p.shape[0], None)
 
         for hittable in self.hittables:
             intersection, intersect_dist, normal = hittable.ray_intersection(ray_p, ray_dir)
@@ -17,15 +18,16 @@ class HittableList:
             closest_dist[new_closest]         = intersect_dist[new_closest]
             closest_intersection[new_closest] = intersection[new_closest]
             closest_normal[new_closest]       = normal[new_closest]
+            closest_material[new_closest]     = hittable.material
 
-        return closest_intersection, closest_dist, closest_normal
+        return closest_intersection, closest_dist, closest_normal, closest_material
 
 
 class Sphere:
-    def __init__(self, center, radius, color):
+    def __init__(self, center, radius, material):
         self.center = center
         self.radius = radius
-        self.color = color
+        self.material = material
 
     def ray_intersection(self, ray_p, ray_dir):
         projection = ray_projection(ray_p, ray_dir, self.center)

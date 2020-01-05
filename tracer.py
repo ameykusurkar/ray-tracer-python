@@ -4,6 +4,7 @@ import time
 
 from sphere import HittableList, Sphere, INFINITY, normalize
 from camera import Camera
+from material import Lambertian, scatter
 
 WIDTH, HEIGHT = 200, 100
 
@@ -17,18 +18,19 @@ def fill_background(ray_p, ray_dir):
 def color(ray_p, ray_dir, hittable):
     colors = fill_background(ray_p, ray_dir)
 
-    intersection, intersect_dist, normal = hittable.ray_intersection(ray_p, ray_dir)
+    intersection, intersect_dist, normal, material = hittable.ray_intersection(ray_p, ray_dir)
     has_hit = intersect_dist < INFINITY
 
     if not np.any(has_hit):
         return colors
 
-    # Add some outward bias, so that the reflected ray does not intersect
-    # the object it just reflected off
-    diffuse_p = intersection[has_hit] + 1e-3 * normal[has_hit]
-    diffuse_dir = normalize(normal[has_hit] + random_in_unit_sphere(np.count_nonzero(has_hit)))
+    scatter_p, scatter_dir, attenuation = scatter(
+        material[has_hit],
+        ray_p[has_hit], ray_dir[has_hit],
+        intersection[has_hit], normal[has_hit],
+    )
 
-    colors[has_hit] = 0.5 * color(diffuse_p, diffuse_dir, hittable)
+    colors[has_hit] = attenuation * color(scatter_p, scatter_dir, hittable)
     return colors
 
 def scale_down_pixels(pixels, factor):
@@ -36,26 +38,9 @@ def scale_down_pixels(pixels, factor):
     new_h, new_w = int(h / factor), int(w / factor)
     return pixels.reshape(new_h, factor, new_w, factor, 3).mean(axis=(1, 3))
 
-def random_in_unit_sphere(n):
-    result = get_random_coords(n)
-    while True:
-        # TODO (optimisation): we don't need to re-check vectors that are already
-        # known from previous iterations to be within the unit sphere
-        not_in_unit_sphere = (result * result).sum(axis=1) >= 1
-        if not np.any(not_in_unit_sphere):
-            break
-        result[not_in_unit_sphere] = get_random_coords(np.count_nonzero(not_in_unit_sphere))
-    return result
-
-# Random co-ordinates where each element is between -1 and 1
-def get_random_coords(n):
-    return 2 * np.random.rand(n, 3) - 1
-
-ray_dir = np.zeros((HEIGHT, WIDTH, 3))
-
 hittable_list = HittableList([
-    Sphere(np.array([0, 0, -1]), 0.5, [1, 0, 0]),
-    Sphere(np.array([0, -100.5, -1]), 100, [1, 0, 0]),
+    Sphere(np.array([0, 0, -1]), 0.5, Lambertian([0.8, 0.3, 0.3])),
+    Sphere(np.array([0, -100.5, -1]), 100, Lambertian([0.8, 0.8, 0])),
 ])
 
 ANTI_ALIASING_FACTOR = 4
