@@ -4,7 +4,7 @@ import time
 
 from sphere import HittableList, Sphere, INFINITY, normalize
 from camera import Camera
-from material import Lambertian, scatter
+from material import Lambertian, Metal, scatter
 
 WIDTH, HEIGHT = 200, 100
 
@@ -40,7 +40,9 @@ def scale_down_pixels(pixels, factor):
 
 hittable_list = HittableList([
     Sphere(np.array([0, 0, -1]), 0.5, Lambertian([0.8, 0.3, 0.3])),
-    Sphere(np.array([0, -100.5, -1]), 100, Lambertian([0.8, 0.8, 0])),
+    Sphere(np.array([-1, 0, -1]), 0.5, Metal([0.8, 0.8, 0.8])),
+    Sphere(np.array([1, 0, -1]), 0.5, Metal([0.8, 0.6, 0.2])),
+    Sphere(np.array([0, -100.5, -1]), 100, Metal([0.8, 0.8, 0.0])),
 ])
 
 ANTI_ALIASING_FACTOR = 4

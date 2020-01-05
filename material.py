@@ -31,6 +31,17 @@ class Lambertian:
         scatter_dir = normalize(normal + random_in_unit_sphere(normal.shape[0]))
         return scatter_p, scatter_dir, self.albedo
 
+class Metal:
+    def __init__(self, albedo):
+        self.albedo = albedo
+
+    def scatter(self, ray_p, ray_dir, intersection, normal):
+        # Add some outward bias, so that the reflected ray does not intersect
+        # the object it just reflected off
+        scatter_p = intersection + 1e-3 * normal
+        scatter_dir = reflect(ray_dir, normal)
+        return scatter_p, scatter_dir, self.albedo
+
 def random_in_unit_sphere(n):
     result = get_random_coords(n)
     while True:
@@ -45,3 +56,7 @@ def random_in_unit_sphere(n):
 # Random co-ordinates where each element is between -1 and 1
 def get_random_coords(n):
     return 2 * np.random.rand(n, 3) - 1
+
+def reflect(incident, normal):
+    in_dot = np.multiply(incident, normal).sum(axis=1, keepdims=True)
+    return incident - 2 * in_dot * normal
