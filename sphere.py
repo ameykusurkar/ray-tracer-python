@@ -32,54 +32,34 @@ class Sphere:
         self.material = material
 
     def ray_intersection(self, ray_p, ray_dir):
-        projection = ray_projection(ray_p, ray_dir, self.center)
-        projection_dist = np.linalg.norm(projection - self.center, axis=1)
+        p_to_center = self.center - ray_p # L
+        proj_dist = np.multiply(p_to_center, ray_dir).sum(axis=1) # tca
+        p_to_center_sq = np.multiply(p_to_center, p_to_center).sum(axis=1) # L^2
+        proj_to_center_dist_sq = p_to_center_sq - np.square(proj_dist) # d^2
 
-        # if projection_dist > self.radius, there is no intersection
-        intersection = np.full(ray_p.shape, INFINITY)
         intersect_dist = np.full(ray_p.shape[0], INFINITY)
+        intersection = np.full(ray_p.shape, INFINITY)
 
-        # if projection_dist == self.radius, there is one intersection
-        intersection[projection_dist == self.radius] = projection[projection_dist == self.radius]
-        intersect_dist = np.where(projection_dist == self.radius, projection_dist, intersect_dist)
+        radius_sq = np.square(self.radius)
 
-        #FIXME: Invalid projection_dist values where there is no projection
-        proj_to_intersect_dist = np.sqrt(
-            np.square(self.radius) - np.square(projection_dist)
-        )
+        # TODO: Account for when ray_p is inside the sphere, in front of self.center
+        has_solution = (proj_to_center_dist_sq <= radius_sq) & (proj_dist > 0)
 
-        # if projection_dist < self.radius, the projection is inside the sphere,
-        # meaning that there are two intersections. We want the nearer one.
-        intersect_dist = np.where(
-            projection_dist < self.radius,
-            np.where(
-                # If the ray origin is inside the sphere,
-                np.linalg.norm(ray_p - self.center, axis=1) < self.radius,
-                # the intersection will be in front of the projection
-                np.linalg.norm(projection - ray_p, axis=1) + proj_to_intersect_dist,
-                # otherwise it will be behind the projection
-                np.linalg.norm(projection - ray_p, axis=1) - proj_to_intersect_dist
-            ),
-            intersect_dist
-        )
-        intersection[projection_dist < self.radius] = (ray_p + (intersect_dist[..., np.newaxis] * ray_dir))[projection_dist < self.radius]
+        # FIXME: Invalid values when projection is outside sphere
+        proj_to_intersect_dist = np.sqrt(radius_sq - proj_to_center_dist_sq) # thc
 
+        inside_sphere = has_solution & (p_to_center_sq < radius_sq)
+        intersect_dist[inside_sphere] = (proj_dist + proj_to_intersect_dist)[inside_sphere]
+
+        outside_sphere = has_solution & (p_to_center_sq >= radius_sq)
+        intersect_dist[outside_sphere] = (proj_dist - proj_to_intersect_dist)[outside_sphere]
+
+        intersection[has_solution] = (ray_p + (intersect_dist[..., np.newaxis] * ray_dir))[has_solution]
+
+        # TODO: Check if we always need to compute intersection, normal
         normal = normalize(intersection - self.center)
         return intersection, intersect_dist, normal
 
-
-def ray_projection(ray_p, ray_dir, point):
-    u, v = point - ray_p, ray_dir
-    return ray_p + vector_projection(u, v)
-
-def vector_projection(u, v):
-    uv_dot = np.multiply(u, v).sum(axis=1, keepdims=True)
-    # TODO: We are going to assume for now that the sphere's centre
-    # will never be behind the ray origin, so we can safely put the
-    # distance as infinity. However, we should account for that case.
-    uv_dot[uv_dot <= 0] = INFINITY
-    v_mag = np.linalg.norm(v, axis=1, keepdims=True)
-    return (uv_dot / v_mag) * v
 
 # TODO: Move this to a more sensible place
 def normalize(v):
