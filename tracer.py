@@ -4,9 +4,10 @@ import time
 
 from sphere import HittableList, Sphere, INFINITY, normalize
 from camera import Camera
-from material import Lambertian, Metal, scatter
+from material import Lambertian, Metal, Dielectric, scatter
 
-WIDTH, HEIGHT = 200, 100
+WIDTH, HEIGHT = 400, 200
+GAMMA = 0.6
 
 def fill_background(ray_p, ray_dir):
     unit_direction = normalize(ray_dir)
@@ -15,8 +16,11 @@ def fill_background(ray_p, ray_dir):
     return (1 - t) * [1.0, 1.0, 1.0] + t * [0.5, 0.7, 1.0]
 
 # TODO: Make this non-recursive
-def color(ray_p, ray_dir, hittable):
+def color(ray_p, ray_dir, hittable, depth=0):
     colors = fill_background(ray_p, ray_dir)
+
+    if depth > 10:
+        return colors
 
     intersection, intersect_dist, normal, material, attenuation = hittable.ray_intersection(ray_p, ray_dir)
     has_hit = intersect_dist < INFINITY
@@ -30,7 +34,7 @@ def color(ray_p, ray_dir, hittable):
         intersection[has_hit], normal[has_hit],
     )
 
-    colors[has_hit] = attenuation[has_hit] * color(scatter_p, scatter_dir, hittable)
+    colors[has_hit] = attenuation[has_hit] * color(scatter_p, scatter_dir, hittable, depth+1)
     return colors
 
 def scale_down_pixels(pixels, factor):
@@ -39,8 +43,8 @@ def scale_down_pixels(pixels, factor):
     return pixels.reshape(new_h, factor, new_w, factor, 3).mean(axis=(1, 3))
 
 hittable_list = HittableList([
-    Sphere(np.array([0, 0, -1]), 0.5, Lambertian([0.8, 0.3, 0.3])),
-    Sphere(np.array([-1, 0, -1]), 0.5, Metal([0.8, 0.8, 0.8])),
+    Sphere(np.array([0, 0, -1]), 0.5, Lambertian([0.1, 0.2, 0.5])),
+    Sphere(np.array([-1, 0, -1]), 0.5, Dielectric([0.8, 0.8, 0.8])),
     Sphere(np.array([1, 0, -1]), 0.5, Metal([0.8, 0.6, 0.2])),
     Sphere(np.array([0, -100.5, -1]), 100, Lambertian([0.8, 0.8, 0.0])),
 ])
@@ -64,7 +68,7 @@ print(f"Time taken: {time.time()-start:0.2f} seconds, Resolution: {WIDTH} x {HEI
 
 pixels = pixels.reshape(camera.height, camera.width, 3)
 pixels = scale_down_pixels(pixels, ANTI_ALIASING_FACTOR)
-pixels = (pixels * 255).astype(np.uint8)
+pixels = (pixels**(1/1.8) * 255).astype(np.uint8)
 
 im = Image.fromarray(pixels)
 im.save("output.png")
